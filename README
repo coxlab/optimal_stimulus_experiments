@@ -1,0 +1,2 @@
+1. load network.mat (for getting exactly the same random PLoS 09 model each time) or run HT_initialize to get a new network.
+2. edit Run_MA to set what layer (Lmax, 2 for L1, 3 for L2, 4 for L3) and what channel (c) you want to visualize.
