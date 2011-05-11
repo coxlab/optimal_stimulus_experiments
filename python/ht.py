@@ -258,7 +258,7 @@ def compare_to_matlab():
     logging.basicConfig(level=logging.DEBUG)
     import cfg
     n = Network(cfg.cfg)
-    n.load_mat_file('network.mat')
+    n.load_mat_file('../network.mat')
     a = np.zeros((1,16,16),dtype=np.float64)
     a[0,7,7] = 1.
     t = m
@@ -274,7 +274,7 @@ def run_l3_n(N=1000):
     #logging.basicConfig(level=logging.DEBUG)
     import cfg
     n = Network(cfg.cfg)
-    n.load_mat_file('network.mat')
+    n.load_mat_file('../network.mat')
     a = np.zeros((1,106,106),dtype=np.float64)
     a[0,7,7] - 1.
     print "Running %i times..." % N
@@ -284,8 +284,8 @@ def run_l3_n(N=1000):
         r = -n.run(a,0,3)
     et = time.time()
     print " dt: ", et-st
-    print " N/dt: ", N/(et-st)
+    print " dt/N: ", (et-st)/N
 
 if __name__ == '__main__':
     #compare_to_matlab()
-    run_l3_n(100)
+    run_l3_n(10)
