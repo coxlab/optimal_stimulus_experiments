@@ -2,6 +2,12 @@
 
 import numpy as np
 
+l1TestSize = 16
+l2TestSize = 46
+l3TestSize = 106
+
+layerTestSizes = [None, l1TestSize, l2TestSize, l3TestSize]
+
 # this would be faster as an object
 class O:
     pass

@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
-import logging
+import logging, stopwatch, sys
 
 import numpy as np
 from scipy.ndimage import convolve
+from scipy.signal import convolve2d
 from scipy.io import loadmat
 
 # dimensions should be as follows:
@@ -60,16 +61,89 @@ def valid_bounds(n):
 # def valid_convolve(a,b):
 #     return [None, valid_1d_convolve, valid_2d_convolve, valid_3d_convolve, valid_4d_convolve][len(b.shape)](a,b)
 
-def valid_convolve(a,b):
+def pad(x,n):
+    y = np.zeros((n,n))
+    d = (n - x.shape[0])/2
+    y[d:x.shape[0] + d,d:x.shape[0] + d] = x
+    return y
+
+def full_to_valid_bounds(n):
+    """
+    2 -> 1, :
+    
+    3 -> 1, -1
+    4 -> 1, -2
+    5 -> 2, -2
+    """
+    if n == 1:
+        return 0, None
+    if n == 2:
+        return 1, None
+    
+    d, m = divmod(n-1,2)
+    return d, -(d+m)
+
+def convolve_fft(a,b):
+    n = a.shape[0] + b.shape[0]
+    apad = pad(a,n)
+    bpad = pad(b,n)
+    z = np.fft.ifftn(np.fft.fftn(apad) * np.fft.fftn(bpad))
+    print a.shape, b.shape, z.shape
+    return z[[slice(*full_to_valid_bounds(n)) for n in b.shape]]
+
+def valid_2_2_convolve(a,b):
+    return convolve2d(a,b,'valid')
+
+def valid_3_2_convolve(a,b):
+    o = a[[slice(None)]+[slice(*valid_bounds(n)) for n in b.shape]]
+    for i in xrange(a.shape[0]):
+        o[i] = valid_2_2_convolve(a[-i],b)
+    return o
+
+def valid_3_3_convolve(a,b):
+    o = a[[slice(None)]+[slice(*valid_bounds(n)) for n in b.shape[1:]]]
+    for i in xrange(a.shape[0]):
+        o[i] = valid_2_2_convolve(a[-i],b[i])
+    return sum(o,0)[np.newaxis,:,:]
+
+def valid_convolve_signal(a,b):
+    if a.ndim == 2:
+        return valid_2_2_convolve(a,b)
+    if b.ndim == 2:
+        return valid_3_2_convolve(a,b)
+    return valid_3_3_convolve(a,b)
+
+def valid_convolve_ndimage(a,b):
     """
     If b.ndim < a.ndim will convolve(a[i],b) for i in a.shape[0]
+    # cases:
+    # a.ndim = 3, b.ndim = 2
+    # a.ndim = 3, b.ndim = 3
+    # a.ndim = 2, b.ndim = 2
     """
+    # if a.ndim != b.ndim:
+    #     print "Diff:", a.ndim, b.ndim
+    # else:
+    #     print "Same:", a.ndim
     if a.ndim > b.ndim: # corner case for lower-dimensional kernels
         o = a[[slice(None)]+[slice(*valid_bounds(n)) for n in b.shape]]
         for i in xrange(a.shape[0]):
             o[i] = valid_convolve(a[-i],b)
         return o
     return convolve(a,b)[[slice(*valid_bounds(n)) for n in b.shape]]
+
+def valid_convolve_fft(a,b):
+    if a.ndim > b.ndim: # corner case for lower-dimensional kernels
+        o = a[[slice(None)]+[slice(*valid_bounds(n)) for n in b.shape]]
+        for i in xrange(a.shape[0]):
+            o[i] = valid_convolve(a[-i],b)
+        return o
+     
+    return np.fft.ifftn(np.fft.fftn(a) * np.fft.fftn(b))[[slice(*valid_bounds(n)) for n in b.shape]]
+    
+valid_convolve = valid_convolve_signal # ~.405 per run
+# valid_convolve = valid_convolve_ndimage # ~.646 per run
+# valid_convolve = convolve_fft # does not work
 
 class Layer(object):
     def __init__(self, cfg, nInFilters):
@@ -99,12 +173,18 @@ class Layer(object):
             return inArr
         if channel is not None:
             #print inArr.shape, self.filters[channel].shape
+            # print "In filt[1] 0 ",; t = stopwatch.Timer()
+            # v = valid_convolve(inArr, self.filters[channel])
+            # t.stop(); print t.elapsed
+            # return v
             return valid_convolve(inArr, self.filters[channel])
         fSize = inArr.shape[1] - self.cfg['filt']['size'] + 1
         o = np.zeros((self.cfg['filt']['number'], fSize, fSize), dtype=np.float64)
+        # print "In filt[2] 0 ",; t = stopwatch.Timer()
         for i in xrange(len(self.filters)):
             # print fSize, inArr.shape, self.filters[i].shape
             o[i,:,:] = valid_convolve(inArr, self.filters[i])
+        # t.stop(); print t.elapsed
         return o
         
     
@@ -119,17 +199,23 @@ class Layer(object):
         # pool = pool(1:network{l}.pool.stride:end, 1:network{l}.pool.stride:end, :);
         # print inArr.shape
         # this line should only compress x and y
+        # print "In pool 1 ",; t = stopwatch.Timer()
         pool = valid_convolve(inArr ** self.cfg['pool']['order'], np.ones((self.cfg['pool']['size'],self.cfg['pool']['size']))) ** (1. / self.cfg['pool']['order'])
+        # t.stop(); print t.elapsed
         # next line should compress x and y based on stride
         return pool[:,::self.cfg['pool']['stride'],::self.cfg['pool']['stride']]
     
     def norm(self, inArr):
+        # print "In norm[1] 2 ",; t = stopwatch.Timer()
         pSum = valid_convolve(inArr.copy(), np.squeeze(np.ones((self.cfg['filt']['number'],
                                             self.cfg['norm']['size'],
                                             self.cfg['norm']['size']))))
+        # t.stop(); print t.elapsed
+        # print "In norm[2] 2 ",; t = stopwatch.Timer()
         pSSum = valid_convolve(inArr.copy() ** 2., np.squeeze(np.ones((self.cfg['filt']['number'],
                                                     self.cfg['norm']['size'],
                                                     self.cfg['norm']['size']))))
+        # t.stop(); print t.elapsed
         pMean = pSum / ((self.cfg['norm']['size'] ** 2.) * self.cfg['filt']['number'])
         
         #posMin = (self.cfg['norm']['size'] + 1) / 2.
@@ -230,16 +316,17 @@ class Network(object):
         lMax : maximum layer to run, this determines the size of the input
         """
         for l in xrange(lMax+1):
-            logging.debug("Running layer: %i" % l)
-            logging.debug(" inArr pre run :")
-            logging.debug("  shape: %s" % repr(inArr.shape))
+            # logging.debug("Running layer: %i" % l)
+            # print "Running layer: %i" % l
+            # logging.debug(" inArr pre run :")
+            # logging.debug("  shape: %s" % repr(inArr.shape))
             # logging.debug("  value: %s" % repr(inArr))
             if lMax == l:
                 inArr = self.layers[l].run(inArr,channel)
             else:
                 inArr = self.layers[l].run(inArr)
-            logging.debug(" inArr post run: ")
-            logging.debug("  shape: %s" % repr(inArr.shape))
+            # logging.debug(" inArr post run: ")
+            # logging.debug("  shape: %s" % repr(inArr.shape))
             # logging.debug("  value: %s" % repr(inArr))
         return inArr
         # -- Layer 0 --
@@ -255,13 +342,12 @@ def compare_to_matlab():
     """
     Passed on May 10, 2011
     """
-    logging.basicConfig(level=logging.DEBUG)
+    #logging.basicConfig(level=logging.DEBUG)
     import cfg
     n = Network(cfg.cfg)
     n.load_mat_file('../network.mat')
     a = np.zeros((1,16,16),dtype=np.float64)
     a[0,7,7] = 1.
-    t = m
     m = np.array([-0.7322,-0.5745,-0.7997,-0.6940,-0.7109,-0.6838,-0.5781,-0.6618,-0.7465,-0.7095,-0.7336,-0.7262,-0.7089,-0.7516,-0.8137,-0.7619])
     vs = np.array([np.squeeze(-n.run(a,i,1)) for i in xrange(16)])
     print "Results"
@@ -287,5 +373,12 @@ def run_l3_n(N=1000):
     print " dt/N: ", (et-st)/N
 
 if __name__ == '__main__':
-    #compare_to_matlab()
-    run_l3_n(10)
+    if len(sys.argv) > 1 and sys.argv[1] == 'validate':
+        compare_to_matlab()
+    else:
+        N = 100
+        try:
+            N = int(sys.argv[1])
+        except:
+            pass
+        run_l3_n(N)
