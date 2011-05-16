@@ -3,6 +3,10 @@
 import os, sys
 
 import numpy as np
+
+import matplotlib
+matplotlib.use('Cairo')   # generate postscript output by default
+
 import pylab as pl
 
 from ht import Network
@@ -63,6 +67,8 @@ for t in xrange(N):
         pl.savefig('%s/progress_%i.png' % (outDir, t))
         pl.close()
         # pl.show()
+        
+        pl.imsave('%s/optimal_%i.png' % (outDir, t), ab[0], cmap=pl.cm.gray)
 
 pl.figure()
 pl.imshow(ab[0])
