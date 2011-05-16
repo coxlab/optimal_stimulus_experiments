@@ -5,7 +5,8 @@ import os, sys
 import numpy as np
 
 import matplotlib
-matplotlib.use('Cairo')   # generate postscript output by default
+if sys.platform == 'linux2': # for headless plot generation
+    matplotlib.use('Cairo')
 
 import pylab as pl
 
@@ -16,11 +17,11 @@ channel = 15
 layer = 1
 N = 100000
 
-if sys.argv > 1:
+if len(sys.argv) > 1:
     channel = int(sys.argv[1])
-if sys.argv > 2:
+if len(sys.argv) > 2:
     layer = int(sys.argv[2])
-if sys.argv > 3:
+if len(sys.argv) > 3:
     N = int(sys.argv[3])
 
 outDir = '%s/%i/%i' % ('revcorr', layer, channel)
