@@ -83,16 +83,31 @@ def full_to_valid_bounds(n):
     d, m = divmod(n-1,2)
     return d, -(d+m)
 
+def fft_to_valid_bounds(a,b):
+    """
+    106, 9 -> 8,-8
+    106, 8 -> 7,-7
+    105, 9 -> 8,-8
+    105, 8 -> 7,-7
+    """
+    lfv, rfv = full_to_valid_bounds(b.shape[0])
+    l = b.shape[0] + lfv
+    r = -b.shape[0] - rfv
+    # l = b.shape[0] / 2
+    # r = l + (b.shape[0] % 2)
+    return l, -r
+
 def convolve_fft(a,b):
     n = a.shape[0] + b.shape[0]
     apad = pad(a,n)
     bpad = pad(b,n)
     z = np.fft.ifftn(np.fft.fftn(apad) * np.fft.fftn(bpad))
-    print a.shape, b.shape, z.shape
-    return z[[slice(*full_to_valid_bounds(n)) for n in b.shape]]
+    # print a.shape, b.shape, z.shape, fft_to_valid_bounds(a,b)
+    return z[[slice(*fft_to_valid_bounds(a,b)) for n in b.shape]]
 
 def valid_2_2_convolve(a,b):
     return convolve2d(a,b,'valid')
+    # return convolve_fft(a,b)
 
 def valid_3_2_convolve(a,b):
     o = a[[slice(None)]+[slice(*valid_bounds(n)) for n in b.shape]]
@@ -132,18 +147,17 @@ def valid_convolve_ndimage(a,b):
         return o
     return convolve(a,b)[[slice(*valid_bounds(n)) for n in b.shape]]
 
-def valid_convolve_fft(a,b):
-    if a.ndim > b.ndim: # corner case for lower-dimensional kernels
-        o = a[[slice(None)]+[slice(*valid_bounds(n)) for n in b.shape]]
-        for i in xrange(a.shape[0]):
-            o[i] = valid_convolve(a[-i],b)
-        return o
-     
-    return np.fft.ifftn(np.fft.fftn(a) * np.fft.fftn(b))[[slice(*valid_bounds(n)) for n in b.shape]]
+# def valid_convolve_fft(a,b):
+#     if a.ndim > b.ndim: # corner case for lower-dimensional kernels
+#         o = a[[slice(None)]+[slice(*valid_bounds(n)) for n in b.shape]]
+#         for i in xrange(a.shape[0]):
+#             o[i] = valid_convolve(a[-i],b)
+#         return o
+#     return np.fft.ifftn(np.fft.fftn(a) * np.fft.fftn(b))[[slice(*valid_bounds(n)) for n in b.shape]]
     
-valid_convolve = valid_convolve_signal # ~.405 per run
+valid_convolve = valid_convolve_signal # ~.405 per run (with signal), ~1.636 per run (with fft)
 # valid_convolve = valid_convolve_ndimage # ~.646 per run
-# valid_convolve = convolve_fft # does not work
+# valid_convolve = valid_convolve_fft # does not work
 
 class Layer(object):
     def __init__(self, cfg, nInFilters):
