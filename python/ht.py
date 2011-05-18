@@ -7,6 +7,8 @@ from scipy.ndimage import convolve
 from scipy.signal import convolve2d
 from scipy.io import loadmat
 
+import cfg
+
 # dimensions should be as follows:
 #  2d:  x   y  (correspond to x and y like inputs)
 #  3d:  c   x   y (correspond to filter channel and x and y like inputs)
@@ -176,14 +178,14 @@ class Layer(object):
         self.randomize_filters()
     
     def randomize_filters(self):
-        if self.cfg['filt']['size'] != 0:
-            self.filters = np.random.rand(self.cfg['filt']['number'],
+        if self.cfg.filt.size != 0:
+            self.filters = np.random.rand(self.cfg.filt.number,
                                             self.nInFilters,
-                                            self.cfg['filt']['size'],
-                                            self.cfg['filt']['size'])
+                                            self.cfg.filt.size,
+                                            self.cfg.filt.size)
     
     def filt(self, inArr, channel=None):
-        if self.cfg['filt']['size'] == 0:
+        if self.cfg.filt.size == 0:
             return inArr
         if channel is not None:
             #print inArr.shape, self.filters[channel].shape
@@ -192,8 +194,8 @@ class Layer(object):
             # t.stop(); print t.elapsed
             # return v
             return valid_convolve(inArr, self.filters[channel])
-        fSize = inArr.shape[1] - self.cfg['filt']['size'] + 1
-        o = np.zeros((self.cfg['filt']['number'], fSize, fSize), dtype=np.float64)
+        fSize = inArr.shape[1] - self.cfg.filt.size + 1
+        o = np.zeros((self.cfg.filt.number, fSize, fSize), dtype=np.float64)
         # print "In filt[2] 0 ",; t = stopwatch.Timer()
         for i in xrange(len(self.filters)):
             # print fSize, inArr.shape, self.filters[i].shape
@@ -203,10 +205,10 @@ class Layer(object):
         
     
     def actv(self, inArr):
-        return np.clip(inArr, self.cfg['actv']['min'], self.cfg['actv']['max'])
+        return np.clip(inArr, self.cfg.actv.min, self.cfg.actv.min)
     
     def pool(self, inArr):
-        if self.cfg['pool']['size'] == 0:
+        if self.cfg.pool.size == 0:
             return inArr
         # .^ = power of
         # pool = convn(actv .^ network{l}.pool.order, ones(network{l}.pool.size), 'valid') .^ (1 / network{l}.pool.order);
@@ -214,33 +216,33 @@ class Layer(object):
         # print inArr.shape
         # this line should only compress x and y
         # print "In pool 1 ",; t = stopwatch.Timer()
-        pool = valid_convolve(inArr ** self.cfg['pool']['order'], np.ones((self.cfg['pool']['size'],self.cfg['pool']['size']))) ** (1. / self.cfg['pool']['order'])
+        pool = valid_convolve(inArr ** self.cfg.pool.order, np.ones((self.cfg.pool.size,self.cfg.pool.size))) ** (1. / self.cfg.pool.order)
         # t.stop(); print t.elapsed
         # next line should compress x and y based on stride
-        return pool[:,::self.cfg['pool']['stride'],::self.cfg['pool']['stride']]
+        return pool[:,::self.cfg.pool.stride,::self.cfg.pool.stride]
     
     def norm(self, inArr):
         # print "In norm[1] 2 ",; t = stopwatch.Timer()
-        pSum = valid_convolve(inArr.copy(), np.squeeze(np.ones((self.cfg['filt']['number'],
-                                            self.cfg['norm']['size'],
-                                            self.cfg['norm']['size']))))
+        pSum = valid_convolve(inArr.copy(), np.squeeze(np.ones((self.cfg.filt.number,
+                                            self.cfg.norm.size,
+                                            self.cfg.norm.size))))
         # t.stop(); print t.elapsed
         # print "In norm[2] 2 ",; t = stopwatch.Timer()
-        pSSum = valid_convolve(inArr.copy() ** 2., np.squeeze(np.ones((self.cfg['filt']['number'],
-                                                    self.cfg['norm']['size'],
-                                                    self.cfg['norm']['size']))))
+        pSSum = valid_convolve(inArr.copy() ** 2., np.squeeze(np.ones((self.cfg.filt.number,
+                                                    self.cfg.norm.size,
+                                                    self.cfg.norm.size))))
         # t.stop(); print t.elapsed
-        pMean = pSum / ((self.cfg['norm']['size'] ** 2.) * self.cfg['filt']['number'])
+        pMean = pSum / ((self.cfg.norm.size ** 2.) * self.cfg.filt.number)
         
         #posMin = (self.cfg['norm']['size'] + 1) / 2.
         # posMin, posMax = valid_bounds(self.cfg['norm']['size'])
-        posSlice = slice(*valid_bounds(self.cfg['norm']['size']))
+        posSlice = slice(*valid_bounds(self.cfg.norm.size))
         # posMin = self.cfg['norm']['size'] / 2.
         # posMax = posMin + inArr.shape[0] - self.cfg['norm']['size']
         
-        if self.cfg['norm']['centering'] == 1:
-            c = inArr[:, posSlice, posSlice] - np.tile(pMean, (self.cfg['filt']['number'], 1, 1))
-            cNorm = pSSum - (pSum ** 2.) / ((self.cfg['norm']['size'] ** 2.) * self.cfg['filt']['number'])
+        if self.cfg.norm.centering == 1:
+            c = inArr[:, posSlice, posSlice] - np.tile(pMean, (self.cfg.filt.number, 1, 1))
+            cNorm = pSSum - (pSum ** 2.) / ((self.cfg.norm.size ** 2.) * self.cfg.filt.number)
             cNorm = cNorm ** 0.5
         else:
             # print inArr.shape
@@ -248,13 +250,13 @@ class Layer(object):
             cNorm = pSSum ** 0.5
         
         # cNorm = cNorm / self.cfg['norm']['gain']
-        cNorm = np.clip(cNorm, 1./self.cfg['norm']['gain'],np.Inf)
+        cNorm = np.clip(cNorm, 1./self.cfg.norm.gain,np.Inf)
         # print c.shape, cNorm.shape
         if cNorm.ndim < 3:
             cNorm = np.reshape(cNorm, (cNorm.shape[0], cNorm.shape[1], 1))
         if c.ndim < 3:
             c = np.reshape(c, (c.shape[0], c.shape[1], 1))
-        return c / np.tile(cNorm, (self.cfg['filt']['number'],1,1))
+        return c / np.tile(cNorm, (self.cfg.filt.number,1,1))
     
     def run(self, inArr, channel=None):
         if channel is None:
@@ -282,29 +284,29 @@ class Network(object):
         # format
         # d['network'][0][<layer>][0][0].<filt/norm/pool/actv>[0][0].<number/size/weights...>[0][0]
         # construct cfg from mat file
-        self.cfg = {}
+        self.cfg = [cfg.LayerCfg(),cfg.LayerCfg(),cfg.LayerCfg(),cfg.LayerCfg()]
         self.layers = []
         for l in xrange(4):
-            self.cfg[l] = {}
-            self.cfg[l]['filt'] = {}
-            self.cfg[l]['filt']['size'] = d['network'][0][l][0][0].filt[0][0].size[0][0]
-            self.cfg[l]['filt']['number'] = d['network'][0][l][0][0].filt[0][0].number[0][0]
-            self.cfg[l]['actv'] = {}
-            self.cfg[l]['actv']['min'] = float(d['network'][0][l][0][0].actv[0][0].min[0][0])
-            self.cfg[l]['actv']['max'] = float(d['network'][0][l][0][0].actv[0][0].max[0][0])
-            self.cfg[l]['pool'] = {}
-            self.cfg[l]['pool']['size'] = d['network'][0][l][0][0].pool[0][0].size[0][0]
-            self.cfg[l]['pool']['order'] = d['network'][0][l][0][0].pool[0][0].order[0][0]
-            self.cfg[l]['pool']['stride'] = d['network'][0][l][0][0].pool[0][0].stride[0][0]
-            self.cfg[l]['norm'] = {}
-            self.cfg[l]['norm']['size'] = d['network'][0][l][0][0].norm[0][0].size[0][0]
-            self.cfg[l]['norm']['centering'] = d['network'][0][l][0][0].norm[0][0].centering[0][0]
-            self.cfg[l]['norm']['gain'] = float(d['network'][0][l][0][0].norm[0][0].gain[0][0])
-            self.cfg[l]['norm']['threshold'] = float(d['network'][0][l][0][0].norm[0][0].threshold[0][0])
+            # self.cfg[l] = {}
+            # self.cfg[l]['filt'] = {}
+            self.cfg[l].filt.size = d['network'][0][l][0][0].filt[0][0].size[0][0]
+            self.cfg[l].filt.number = d['network'][0][l][0][0].filt[0][0].number[0][0]
+            # self.cfg[l]['actv'] = {}
+            self.cfg[l].actv.min = float(d['network'][0][l][0][0].actv[0][0].min[0][0])
+            self.cfg[l].actv.max = float(d['network'][0][l][0][0].actv[0][0].max[0][0])
+            # self.cfg[l]['pool'] = {}
+            self.cfg[l].pool.size = d['network'][0][l][0][0].pool[0][0].size[0][0]
+            self.cfg[l].pool.order = d['network'][0][l][0][0].pool[0][0].order[0][0]
+            self.cfg[l].pool.stride = d['network'][0][l][0][0].pool[0][0].stride[0][0]
+            # self.cfg[l]['norm'] = {}
+            self.cfg[l].norm.size = d['network'][0][l][0][0].norm[0][0].size[0][0]
+            self.cfg[l].norm.centering = d['network'][0][l][0][0].norm[0][0].centering[0][0]
+            self.cfg[l].norm.gain = float(d['network'][0][l][0][0].norm[0][0].gain[0][0])
+            self.cfg[l].norm.threshold = float(d['network'][0][l][0][0].norm[0][0].threshold[0][0])
             
             # load weights 
             if l != 0:
-                lay = Layer(self.cfg[l],self.cfg[l-1]['filt']['number']) # make with random weights??
+                lay = Layer(self.cfg[l],self.cfg[l-1].filt.number) # make with random weights??
                 for (i,f) in enumerate(d['network'][0][l][0][0].filt[0][0].weights[0]):
                     if lay.filters[i].shape == f.shape:
                         lay.filters[i] = f
@@ -323,7 +325,7 @@ class Network(object):
         self.layers = []
         for i in xrange(len(self.cfg)):
             self.layers.append(Layer(self.cfg[i],prevNFilters))
-            prevNFilters = self.cfg[i]['filt']['number']
+            prevNFilters = self.cfg[i].filt.number
     
     def run(self, inArr, channel, lMax):
         """
