@@ -27,7 +27,7 @@ if len(sys.argv) > 2:
 if len(sys.argv) > 3:
     N = int(sys.argv[3])
 
-outDir = '%s/%i/%i' % ('revcorr', layer, channel)
+outDir = '%s/%i/%i' % ('ga', layer, channel)
 try:
     os.makedirs(outDir)
 except OSError:
@@ -52,7 +52,7 @@ ga = GSimpleGA.GSimpleGA(genome)
 ga.setPopulationSize(NPop)
 ga.setGenerations(NGen)
 
-csvfile_adapter = DBAdapters.DBFileCSV(filename="%i_%i.csv" % (layer, channel), frequency=NGen/10)
+csvfile_adapter = DBAdapters.DBFileCSV(filename="%s/%i_%i.csv" % (outDir, layer, channel), frequency=NGen/10)
 ga.setDBAdapter(csvfile_adapter)
 # sqlite_adapter = DBAdapters.DBSQLite(identify="%i_%i" % (layer, channel),frequency=NGen/10)
 # ga.setDBAdapter(sqlite_adapter)
