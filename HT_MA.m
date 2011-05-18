@@ -1,16 +1,6 @@
-function output = HT_MA(input,network,c,Lmax)
+function output = HT_MA(input,isize,network,c,Lmax,s)
 
 Lmin = 1;
-%Lmax = 2; %size(network, 2);
-
-if (Lmax == 2)
-    isize = 16;
-elseif (Lmax == 3)
-    isize = 46;
-else
-    isize = 106;
-end
-
 input = reshape(input, [isize isize]);
 
 for l = Lmin:Lmax
@@ -22,10 +12,10 @@ for l = Lmin:Lmax
             filt = zeros(filt_size, filt_size, network{l}.filt.number);
         
             for f = 1:network{l}.filt.number
-                filt(:,:,f) = convn(input, network{l}.filt.weights{f}, 'valid');
+                filt(:,:,f) = convn(input, network{l}.filt.weights{s,f}, 'valid');
             end
         else
-            filt = convn(input, network{l}.filt.weights{c}, 'valid');
+            filt = convn(input, network{l}.filt.weights{s,c}, 'valid');
         end
     else
         filt = input;
@@ -74,10 +64,13 @@ for l = Lmin:Lmax
     % Next Layer or Output
     if (l ~= Lmax)
         input = norm;
+        
+%         figure; colormap(gray); 
+%         px = 2^round(log2(size(norm,3))/2); py = size(norm,3)/px;
+%         for i = 1:size(norm,3)
+%             subplot(px,py,i); imagesc(norm(:,:,i));
+%         end
     else
         output = -norm;
     end
-    
-    %figure; imagesc(norm(:,:,1));
-    %figure; hist(norm(:));
 end
