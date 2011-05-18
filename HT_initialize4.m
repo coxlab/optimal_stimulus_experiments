@@ -3,7 +3,7 @@ layer = 1;
 filt.size = 0; filt.number = 1;
 actv.min = -Inf; actv.max = Inf; 
 pool.size = 0; pool.order = 0; pool.stride = 0;
-norm.size = 9; norm.centering = 0; norm.gain = 1.0; norm.threshold = 1.0;
+norm.size = 3; norm.centering = 0; norm.gain = 10.0; norm.threshold = 1.0;
 
 network{layer}.filt = filt;
 network{layer}.actv = actv;
@@ -12,10 +12,10 @@ network{layer}.norm = norm;
 
 layer = 2;
 
-filt.size = 3; filt.number = 16;
-actv.min = 0; actv.max = Inf; 
-pool.size = 5; pool.order = 2; pool.stride = 2;
-norm.size = 9; norm.centering = 0; norm.gain = 0.1; norm.threshold = 10.0;
+filt.size = 5; filt.number = 32;
+actv.min = -Inf; actv.max = Inf; 
+pool.size = 3; pool.order = 1; pool.stride = 2;
+norm.size = 3; norm.centering = 0; norm.gain = 0.1; norm.threshold = 10.0;
 
 network{layer}.filt = filt;
 network{layer}.actv = actv;
@@ -24,10 +24,10 @@ network{layer}.norm = norm;
 
 layer = 3;
 
-filt.size = 3; filt.number = 32;
-actv.min = 0; actv.max = Inf; 
-pool.size = 5; pool.order = 10; pool.stride = 2;
-norm.size = 5; norm.centering = 1; norm.gain = 0.1; norm.threshold = 10.0;
+filt.size = 5; filt.number = 16;
+actv.min = 0; actv.max = 1; 
+pool.size = 9; pool.order = 1; pool.stride = 2;
+norm.size = 9; norm.centering = 0; norm.gain = 10.0; norm.threshold = 10.0;
 
 network{layer}.filt = filt;
 network{layer}.actv = actv;
@@ -36,10 +36,10 @@ network{layer}.norm = norm;
 
 layer = 4;
 
-filt.size = 3; filt.number = 128;
-actv.min = -Inf; actv.max = 1; 
-pool.size = 9; pool.order = 2; pool.stride = 2;
-norm.size = 3; norm.centering = 0; norm.gain = 0.1; norm.threshold = 1.0;
+filt.size = 7; filt.number = 256;
+actv.min = 0; actv.max = Inf; 
+pool.size = 7; pool.order = 2; pool.stride = 2;
+norm.size = 3; norm.centering = 0; norm.gain = 10.0; norm.threshold = 0.1;
 
 network{layer}.filt = filt;
 network{layer}.actv = actv;

@@ -7,6 +7,8 @@ from scipy.ndimage import convolve
 from scipy.signal import convolve2d
 from scipy.io import loadmat
 
+import cfg
+
 # dimensions should be as follows:
 #  2d:  x   y  (correspond to x and y like inputs)
 #  3d:  c   x   y (correspond to filter channel and x and y like inputs)
@@ -83,16 +85,31 @@ def full_to_valid_bounds(n):
     d, m = divmod(n-1,2)
     return d, -(d+m)
 
+def fft_to_valid_bounds(a,b):
+    """
+    106, 9 -> 8,-8
+    106, 8 -> 7,-7
+    105, 9 -> 8,-8
+    105, 8 -> 7,-7
+    """
+    lfv, rfv = full_to_valid_bounds(b.shape[0])
+    l = b.shape[0] + lfv
+    r = -b.shape[0] - rfv
+    # l = b.shape[0] / 2
+    # r = l + (b.shape[0] % 2)
+    return l, -r
+
 def convolve_fft(a,b):
     n = a.shape[0] + b.shape[0]
     apad = pad(a,n)
     bpad = pad(b,n)
     z = np.fft.ifftn(np.fft.fftn(apad) * np.fft.fftn(bpad))
-    print a.shape, b.shape, z.shape
-    return z[[slice(*full_to_valid_bounds(n)) for n in b.shape]]
+    # print a.shape, b.shape, z.shape, fft_to_valid_bounds(a,b)
+    return z[[slice(*fft_to_valid_bounds(a,b)) for n in b.shape]]
 
 def valid_2_2_convolve(a,b):
     return convolve2d(a,b,'valid')
+    # return convolve_fft(a,b)
 
 def valid_3_2_convolve(a,b):
     o = a[[slice(None)]+[slice(*valid_bounds(n)) for n in b.shape]]
@@ -132,18 +149,17 @@ def valid_convolve_ndimage(a,b):
         return o
     return convolve(a,b)[[slice(*valid_bounds(n)) for n in b.shape]]
 
-def valid_convolve_fft(a,b):
-    if a.ndim > b.ndim: # corner case for lower-dimensional kernels
-        o = a[[slice(None)]+[slice(*valid_bounds(n)) for n in b.shape]]
-        for i in xrange(a.shape[0]):
-            o[i] = valid_convolve(a[-i],b)
-        return o
-     
-    return np.fft.ifftn(np.fft.fftn(a) * np.fft.fftn(b))[[slice(*valid_bounds(n)) for n in b.shape]]
+# def valid_convolve_fft(a,b):
+#     if a.ndim > b.ndim: # corner case for lower-dimensional kernels
+#         o = a[[slice(None)]+[slice(*valid_bounds(n)) for n in b.shape]]
+#         for i in xrange(a.shape[0]):
+#             o[i] = valid_convolve(a[-i],b)
+#         return o
+#     return np.fft.ifftn(np.fft.fftn(a) * np.fft.fftn(b))[[slice(*valid_bounds(n)) for n in b.shape]]
     
-valid_convolve = valid_convolve_signal # ~.405 per run
+valid_convolve = valid_convolve_signal # ~.405 per run (with signal), ~1.636 per run (with fft)
 # valid_convolve = valid_convolve_ndimage # ~.646 per run
-# valid_convolve = convolve_fft # does not work
+# valid_convolve = valid_convolve_fft # does not work
 
 class Layer(object):
     def __init__(self, cfg, nInFilters):
@@ -162,14 +178,14 @@ class Layer(object):
         self.randomize_filters()
     
     def randomize_filters(self):
-        if self.cfg['filt']['size'] != 0:
-            self.filters = np.random.rand(self.cfg['filt']['number'],
+        if self.cfg.filt.size != 0:
+            self.filters = np.random.rand(self.cfg.filt.number,
                                             self.nInFilters,
-                                            self.cfg['filt']['size'],
-                                            self.cfg['filt']['size'])
+                                            self.cfg.filt.size,
+                                            self.cfg.filt.size)
     
     def filt(self, inArr, channel=None):
-        if self.cfg['filt']['size'] == 0:
+        if self.cfg.filt.size == 0:
             return inArr
         if channel is not None:
             #print inArr.shape, self.filters[channel].shape
@@ -178,8 +194,8 @@ class Layer(object):
             # t.stop(); print t.elapsed
             # return v
             return valid_convolve(inArr, self.filters[channel])
-        fSize = inArr.shape[1] - self.cfg['filt']['size'] + 1
-        o = np.zeros((self.cfg['filt']['number'], fSize, fSize), dtype=np.float64)
+        fSize = inArr.shape[1] - self.cfg.filt.size + 1
+        o = np.zeros((self.cfg.filt.number, fSize, fSize), dtype=np.float64)
         # print "In filt[2] 0 ",; t = stopwatch.Timer()
         for i in xrange(len(self.filters)):
             # print fSize, inArr.shape, self.filters[i].shape
@@ -189,10 +205,10 @@ class Layer(object):
         
     
     def actv(self, inArr):
-        return np.clip(inArr, self.cfg['actv']['min'], self.cfg['actv']['max'])
+        return np.clip(inArr, self.cfg.actv.min, self.cfg.actv.min)
     
     def pool(self, inArr):
-        if self.cfg['pool']['size'] == 0:
+        if self.cfg.pool.size == 0:
             return inArr
         # .^ = power of
         # pool = convn(actv .^ network{l}.pool.order, ones(network{l}.pool.size), 'valid') .^ (1 / network{l}.pool.order);
@@ -200,33 +216,33 @@ class Layer(object):
         # print inArr.shape
         # this line should only compress x and y
         # print "In pool 1 ",; t = stopwatch.Timer()
-        pool = valid_convolve(inArr ** self.cfg['pool']['order'], np.ones((self.cfg['pool']['size'],self.cfg['pool']['size']))) ** (1. / self.cfg['pool']['order'])
+        pool = valid_convolve(inArr ** self.cfg.pool.order, np.ones((self.cfg.pool.size,self.cfg.pool.size))) ** (1. / self.cfg.pool.order)
         # t.stop(); print t.elapsed
         # next line should compress x and y based on stride
-        return pool[:,::self.cfg['pool']['stride'],::self.cfg['pool']['stride']]
+        return pool[:,::self.cfg.pool.stride,::self.cfg.pool.stride]
     
     def norm(self, inArr):
         # print "In norm[1] 2 ",; t = stopwatch.Timer()
-        pSum = valid_convolve(inArr.copy(), np.squeeze(np.ones((self.cfg['filt']['number'],
-                                            self.cfg['norm']['size'],
-                                            self.cfg['norm']['size']))))
+        pSum = valid_convolve(inArr.copy(), np.squeeze(np.ones((self.cfg.filt.number,
+                                            self.cfg.norm.size,
+                                            self.cfg.norm.size))))
         # t.stop(); print t.elapsed
         # print "In norm[2] 2 ",; t = stopwatch.Timer()
-        pSSum = valid_convolve(inArr.copy() ** 2., np.squeeze(np.ones((self.cfg['filt']['number'],
-                                                    self.cfg['norm']['size'],
-                                                    self.cfg['norm']['size']))))
+        pSSum = valid_convolve(inArr.copy() ** 2., np.squeeze(np.ones((self.cfg.filt.number,
+                                                    self.cfg.norm.size,
+                                                    self.cfg.norm.size))))
         # t.stop(); print t.elapsed
-        pMean = pSum / ((self.cfg['norm']['size'] ** 2.) * self.cfg['filt']['number'])
+        pMean = pSum / ((self.cfg.norm.size ** 2.) * self.cfg.filt.number)
         
         #posMin = (self.cfg['norm']['size'] + 1) / 2.
         # posMin, posMax = valid_bounds(self.cfg['norm']['size'])
-        posSlice = slice(*valid_bounds(self.cfg['norm']['size']))
+        posSlice = slice(*valid_bounds(self.cfg.norm.size))
         # posMin = self.cfg['norm']['size'] / 2.
         # posMax = posMin + inArr.shape[0] - self.cfg['norm']['size']
         
-        if self.cfg['norm']['centering'] == 1:
-            c = inArr[:, posSlice, posSlice] - np.tile(pMean, (self.cfg['filt']['number'], 1, 1))
-            cNorm = pSSum - (pSum ** 2.) / ((self.cfg['norm']['size'] ** 2.) * self.cfg['filt']['number'])
+        if self.cfg.norm.centering == 1:
+            c = inArr[:, posSlice, posSlice] - np.tile(pMean, (self.cfg.filt.number, 1, 1))
+            cNorm = pSSum - (pSum ** 2.) / ((self.cfg.norm.size ** 2.) * self.cfg.filt.number)
             cNorm = cNorm ** 0.5
         else:
             # print inArr.shape
@@ -234,13 +250,13 @@ class Layer(object):
             cNorm = pSSum ** 0.5
         
         # cNorm = cNorm / self.cfg['norm']['gain']
-        cNorm = np.clip(cNorm, 1./self.cfg['norm']['gain'],np.Inf)
+        cNorm = np.clip(cNorm, 1./self.cfg.norm.gain,np.Inf)
         # print c.shape, cNorm.shape
         if cNorm.ndim < 3:
             cNorm = np.reshape(cNorm, (cNorm.shape[0], cNorm.shape[1], 1))
         if c.ndim < 3:
             c = np.reshape(c, (c.shape[0], c.shape[1], 1))
-        return c / np.tile(cNorm, (self.cfg['filt']['number'],1,1))
+        return c / np.tile(cNorm, (self.cfg.filt.number,1,1))
     
     def run(self, inArr, channel=None):
         if channel is None:
@@ -268,29 +284,29 @@ class Network(object):
         # format
         # d['network'][0][<layer>][0][0].<filt/norm/pool/actv>[0][0].<number/size/weights...>[0][0]
         # construct cfg from mat file
-        self.cfg = {}
+        self.cfg = [cfg.LayerCfg(),cfg.LayerCfg(),cfg.LayerCfg(),cfg.LayerCfg()]
         self.layers = []
         for l in xrange(4):
-            self.cfg[l] = {}
-            self.cfg[l]['filt'] = {}
-            self.cfg[l]['filt']['size'] = d['network'][0][l][0][0].filt[0][0].size[0][0]
-            self.cfg[l]['filt']['number'] = d['network'][0][l][0][0].filt[0][0].number[0][0]
-            self.cfg[l]['actv'] = {}
-            self.cfg[l]['actv']['min'] = float(d['network'][0][l][0][0].actv[0][0].min[0][0])
-            self.cfg[l]['actv']['max'] = float(d['network'][0][l][0][0].actv[0][0].max[0][0])
-            self.cfg[l]['pool'] = {}
-            self.cfg[l]['pool']['size'] = d['network'][0][l][0][0].pool[0][0].size[0][0]
-            self.cfg[l]['pool']['order'] = d['network'][0][l][0][0].pool[0][0].order[0][0]
-            self.cfg[l]['pool']['stride'] = d['network'][0][l][0][0].pool[0][0].stride[0][0]
-            self.cfg[l]['norm'] = {}
-            self.cfg[l]['norm']['size'] = d['network'][0][l][0][0].norm[0][0].size[0][0]
-            self.cfg[l]['norm']['centering'] = d['network'][0][l][0][0].norm[0][0].centering[0][0]
-            self.cfg[l]['norm']['gain'] = float(d['network'][0][l][0][0].norm[0][0].gain[0][0])
-            self.cfg[l]['norm']['threshold'] = float(d['network'][0][l][0][0].norm[0][0].threshold[0][0])
+            # self.cfg[l] = {}
+            # self.cfg[l]['filt'] = {}
+            self.cfg[l].filt.size = d['network'][0][l][0][0].filt[0][0].size[0][0]
+            self.cfg[l].filt.number = d['network'][0][l][0][0].filt[0][0].number[0][0]
+            # self.cfg[l]['actv'] = {}
+            self.cfg[l].actv.min = float(d['network'][0][l][0][0].actv[0][0].min[0][0])
+            self.cfg[l].actv.max = float(d['network'][0][l][0][0].actv[0][0].max[0][0])
+            # self.cfg[l]['pool'] = {}
+            self.cfg[l].pool.size = d['network'][0][l][0][0].pool[0][0].size[0][0]
+            self.cfg[l].pool.order = d['network'][0][l][0][0].pool[0][0].order[0][0]
+            self.cfg[l].pool.stride = d['network'][0][l][0][0].pool[0][0].stride[0][0]
+            # self.cfg[l]['norm'] = {}
+            self.cfg[l].norm.size = d['network'][0][l][0][0].norm[0][0].size[0][0]
+            self.cfg[l].norm.centering = d['network'][0][l][0][0].norm[0][0].centering[0][0]
+            self.cfg[l].norm.gain = float(d['network'][0][l][0][0].norm[0][0].gain[0][0])
+            self.cfg[l].norm.threshold = float(d['network'][0][l][0][0].norm[0][0].threshold[0][0])
             
             # load weights 
             if l != 0:
-                lay = Layer(self.cfg[l],self.cfg[l-1]['filt']['number']) # make with random weights??
+                lay = Layer(self.cfg[l],self.cfg[l-1].filt.number) # make with random weights??
                 for (i,f) in enumerate(d['network'][0][l][0][0].filt[0][0].weights[0]):
                     if lay.filters[i].shape == f.shape:
                         lay.filters[i] = f
@@ -309,7 +325,7 @@ class Network(object):
         self.layers = []
         for i in xrange(len(self.cfg)):
             self.layers.append(Layer(self.cfg[i],prevNFilters))
-            prevNFilters = self.cfg[i]['filt']['number']
+            prevNFilters = self.cfg[i].filt.number
     
     def run(self, inArr, channel, lMax):
         """
