@@ -205,7 +205,7 @@ class Layer(object):
         
     
     def actv(self, inArr):
-        return np.clip(inArr, self.cfg.actv.min, self.cfg.actv.min)
+        return np.clip(inArr, self.cfg.actv.min, self.cfg.actv.max)
     
     def pool(self, inArr):
         if self.cfg.pool.size == 0:
