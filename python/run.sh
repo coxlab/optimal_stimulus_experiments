@@ -30,3 +30,10 @@ do
   echo "layer 2 channel $(($V+3))"
   python $SCRIPT $(($V+3)) 2 1000000
 done
+
+# layer 3
+for C in {0..128}
+do
+    echo "layer 3 channel $C"
+    python $SCRIPT $C 3 10000000 &
+done
