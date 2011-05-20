@@ -22,11 +22,11 @@ for C in {0..8}
 do
   V=$(($C * 4))
   echo "layer 2 channel $V"
-  python $SCRIPT $V 2 10000000
+  python $SCRIPT $V 2 10000000 &
   echo "layer 2 channel $(($V+1))"
   python $SCRIPT $(($V+1)) 2 10000000
   echo "layer 2 channel $(($V+2))"
-  python $SCRIPT $(($V+2)) 2 10000000
+  python $SCRIPT $(($V+2)) 2 10000000 &
   echo "layer 2 channel $(($V+3))"
-  python $SCRIPT $(($V+3)) 2 10000000 &
+  python $SCRIPT $(($V+3)) 2 10000000
 done
