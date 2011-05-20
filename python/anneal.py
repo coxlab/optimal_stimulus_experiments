@@ -53,11 +53,18 @@ times = []
 for I in xrange(NReps):
     print "Test: %i" % I 
     x0 = np.random.rand(1,cfg.layerTestSizes[layer],cfg.layerTestSizes[layer])
+    # x0 = np.random.randint(0,255,(1,cfg.layerTestSizes[layer],cfg.layerTestSizes[layer]))
     # xOpt, maxResp, nIter, funcCalls, warnFlags = scipy.optimize.fmin(eval_func, x0, maxiter=1000000, full_output=1)
     # from source of anneal: return best_state.x, best_state.cost, schedule.T, schedule.feval, iters, schedule.accepted, retval
     startTime = time.time()
-    # 'fast', 'boltzmann', 'cauchy'
-    xOpt, maxResp, T, fEval, nIter, accepts, cond = scipy.optimize.anneal(eval_func, x0, maxiter=10000, full_output=1, schedule='fast', lower=0, upper=1, dwell=50)
+    # Test: 'fast', 'boltzmann', 'cauchy' : parameters tested
+    # xOpt, maxResp, T, fEval, nIter, accepts, cond = scipy.optimize.anneal(eval_func, x0, maxiter=10000, full_output=1, schedule='cauchy', dwell=50, learn_rate=0.5)
+    # xOpt, maxResp, gradOpt, bOpt, funcCalls, gradCalls, warnFlags = scipy.optimize.fmin_bfgs(eval_func, xOpt, full_output=1, gtol=1e-5)
+    #  'boltzmann' : 1.038
+    #  'fast'      : 1.144
+    #  'cauchy'    : 1.200
+    xOpt, maxResp, T, fEval, nIter, accepts, cond = scipy.optimize.anneal(eval_func, x0, maxiter=10000, full_output=1, schedule='cauchy')
+    xOpt, maxResp, gradOpt, bOpt, funcCalls, gradCalls, warnFlags = scipy.optimize.fmin_bfgs(eval_func, xOpt, full_output=1)
     endTime = time.time()
     maxResp = 100 - maxResp
     print "  N: %i V: %.3f Time: %.3f" % (nIter, maxResp, endTime-startTime)
