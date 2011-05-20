@@ -16,7 +16,7 @@ from ht import Network
 import cfg
 
 channel = 0
-layer = 2
+layer = 1
 NReps = 1
 
 if len(sys.argv) > 1:
@@ -28,7 +28,7 @@ if len(sys.argv) > 3:
 if len(sys.argv) > 4:
     NReps = int(sys.argv[4])
 
-outDir = '%s/%i/%i' % ('anneal', layer, channel)
+outDir = '%s/%i/%i' % ('nlopt', layer, channel)
 try:
     os.makedirs(outDir)
 except OSError:
@@ -78,7 +78,7 @@ for I in xrange(NReps):
     
     
     print "  N: %i V: %.3f Time: %.3f" % (nIter, maxResp, endTime-startTime)
-    pl.imsave('%s/anneal_%i_%.3f_%i.png' % (outDir, I, maxResp, nIter), xOpt.reshape(cfg.layerTestSizes[layer],cfg.layerTestSizes[layer]), cmap=pl.cm.gray)
+    pl.imsave('%s/nlopt_%i_%.3f_%i.png' % (outDir, I, maxResp, nIter), xOpt.reshape(cfg.layerTestSizes[layer],cfg.layerTestSizes[layer]), cmap=pl.cm.gray)
     times.append(endTime-startTime)
 
 if len(times) > 1:
