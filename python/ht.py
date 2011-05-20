@@ -280,6 +280,44 @@ class Network(object):
             self.make_layers()
     
     def load_mat_file(self, matFile):
+        self.load_mat_file_new(matFile)
+    
+    def load_mat_file_new(self, matFile):
+        nd = loadmat(matFile)['network'][0]
+        self.cfg = [cfg.LayerCfg(),cfg.LayerCfg(),cfg.LayerCfg(),cfg.LayerCfg()]
+        self.layers = []
+        for l in xrange(4):
+            self.cfg[l].filt.size = int(nd[l]['filt'][0][0]['size'])
+            self.cfg[l].filt.number = int(nd[l]['filt'][0][0]['number'])
+            
+            self.cfg[l].actv.min = float(nd[l]['actv'][0][0]['min'])
+            self.cfg[l].actv.max = float(nd[l]['actv'][0][0]['max'])
+            
+            self.cfg[l].pool.size = int(nd[l]['pool'][0][0]['size'])
+            self.cfg[l].pool.order = int(nd[l]['pool'][0][0]['order'])
+            self.cfg[l].pool.stride = int(nd[l]['pool'][0][0]['stride'])
+            
+            self.cfg[l].norm.size = int(nd[l]['norm'][0][0]['size'])
+            self.cfg[l].norm.centering = int(nd[l]['norm'][0][0]['centering'])
+            self.cfg[l].norm.gain = float(nd[l]['norm'][0][0]['gain'])
+            self.cfg[l].norm.threshold = float(nd[l]['norm'][0][0]['threshold'])
+            # load weights 
+            if l != 0:
+                lay = Layer(self.cfg[l],self.cfg[l-1].filt.number) # make with random weights??
+                for (i,f) in enumerate(nd[l]['filt'][0][0]['weights'][0][0][0]):
+                    if lay.filters[i].shape == f.shape:
+                        lay.filters[i] = f
+                    elif lay.filters[i].ndim == f.ndim:
+                        #print l, np.squeeze(lay.filters[i]).shape, f.shape
+                        for i2 in xrange(lay.filters[i].shape[0]):
+                            lay.filters[i][i2] = f[:,:,i2]
+                    else:
+                        lay.filters[i,0,:,:] = f[:,:]
+            else:
+                lay = Layer(self.cfg[l],0)
+            self.layers.append(lay)
+    
+    def load_mat_file_old(self, matFile):
         d = loadmat(matFile)
         # format
         # d['network'][0][<layer>][0][0].<filt/norm/pool/actv>[0][0].<number/size/weights...>[0][0]
@@ -287,22 +325,31 @@ class Network(object):
         self.cfg = [cfg.LayerCfg(),cfg.LayerCfg(),cfg.LayerCfg(),cfg.LayerCfg()]
         self.layers = []
         for l in xrange(4):
-            # self.cfg[l] = {}
-            # self.cfg[l]['filt'] = {}
             self.cfg[l].filt.size = d['network'][0][l][0][0].filt[0][0].size[0][0]
             self.cfg[l].filt.number = d['network'][0][l][0][0].filt[0][0].number[0][0]
-            # self.cfg[l]['actv'] = {}
+            # self.cfg[l].filt.size = d['network'][0][l]['filt'][0].size
+            # self.cfg[l].filt.number = d['network'][0][l]['filt'][0].number
+            
             self.cfg[l].actv.min = float(d['network'][0][l][0][0].actv[0][0].min[0][0])
             self.cfg[l].actv.max = float(d['network'][0][l][0][0].actv[0][0].max[0][0])
-            # self.cfg[l]['pool'] = {}
+            # self.cfg[l].actv.min = float(d['network'][0][l]['actv'][0].min)
+            # self.cfg[l].actv.max = float(d['network'][0][l]['actv'][0].max)
+            
             self.cfg[l].pool.size = d['network'][0][l][0][0].pool[0][0].size[0][0]
             self.cfg[l].pool.order = d['network'][0][l][0][0].pool[0][0].order[0][0]
             self.cfg[l].pool.stride = d['network'][0][l][0][0].pool[0][0].stride[0][0]
-            # self.cfg[l]['norm'] = {}
+            # self.cfg[l].pool.size = d['network'][0][l]['pool'][0].size
+            # self.cfg[l].pool.order = d['network'][0][l]['pool'][0].order
+            # self.cfg[l].pool.stride = d['network'][0][l]['pool'][0].stride
+            
             self.cfg[l].norm.size = d['network'][0][l][0][0].norm[0][0].size[0][0]
             self.cfg[l].norm.centering = d['network'][0][l][0][0].norm[0][0].centering[0][0]
             self.cfg[l].norm.gain = float(d['network'][0][l][0][0].norm[0][0].gain[0][0])
             self.cfg[l].norm.threshold = float(d['network'][0][l][0][0].norm[0][0].threshold[0][0])
+            # self.cfg[l].norm.size = d['network'][0][l]['norm'][0].size
+            # self.cfg[l].norm.centering = d['network'][0][l]['norm'][0].centering
+            # self.cfg[l].norm.gain = float(d['network'][0][l]['norm'][0].gain)
+            # self.cfg[l].norm.threshold = d['network'][0][l]['norm'][0].threshold
             
             # load weights 
             if l != 0:
