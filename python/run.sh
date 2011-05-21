@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SCRIPT='anneal.py'
+SCRIPT='nlopttest.py'
 
 # layer 1
 for C in {0..3}
@@ -17,6 +17,7 @@ do
   python $SCRIPT $(($V+3)) 1 10000 
 done
 
+
 # layer 2
 for C in {0..7}
 do
@@ -30,6 +31,8 @@ do
   echo "layer 2 channel $(($V+3))"
   python $SCRIPT $(($V+3)) 2 1000000
 done
+
+exit
 
 # layer 3
 for C in {0..128}
