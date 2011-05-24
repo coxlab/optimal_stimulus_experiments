@@ -70,7 +70,7 @@ for I in xrange(NReps):
     startTime = time.time()
     # =================== -> optimize (eval_func, x0)
     
-    xOpt, maxResp, nIter, outDict = cma.fmin(eval_func, x0, sigma0, tolfun=1e-6, tolfunhist=1e-6, bounds=[-1,1])
+    xOpt, maxResp, nIter, outDict = cma.fmin(eval_func, x0, sigma0, maxiter=ND*100, verb_log=0)
     
     # ===================
     endTime = time.time()
@@ -91,8 +91,8 @@ for I in xrange(NReps):
     pl.plot(vs)
     pl.savefig('%s/cma_%i_%.3f_prog.png' % (outDir, I, maxResp))
     pl.close()
-    cma.plotdata()
-    cma.show()
+    # cma.plotdata()
+    # cma.show()
     vs = []
 
 if len(times) > 1:
