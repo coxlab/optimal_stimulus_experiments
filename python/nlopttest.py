@@ -19,7 +19,7 @@ from ht import Network
 import cfg
 
 channel = 0
-layer = 1
+layer = 2
 NReps = 1
 
 if len(sys.argv) > 1:
@@ -73,17 +73,17 @@ for I in xrange(NReps):
     # LN_PRAXIS : slow, stopped
     # LN_NELDERMEAD : slow, stopped
     # LN_SBPLX : fast, bad result: 0.8-1.0
-    # GN_ISRES : slow, stopped
+    # GN_ISRES : very slow
     # GN_MLSL : 
-    algorithm = nlopt.GN_ISRES
+    algorithm = nlopt.GN_MLSL
     opt = nlopt.opt(algorithm, ND)
     opt.set_max_objective(eval_func)
     opt.set_lower_bounds(np.ones(ND) * -1000000)
     opt.set_upper_bounds(np.ones(ND) * 1000000)
-    opt.set_maxeval(100000)
-    opt.set_ftol_rel(0.001)
-    opt.set_xtol_rel(0.1)
-    opt.set_maxtime(240)
+    #opt.set_maxeval(100000)
+    #opt.set_ftol_rel(0.001)
+    #opt.set_xtol_rel(0.1)
+    #opt.set_maxtime(2400)
     
     # ======
 
@@ -91,11 +91,19 @@ for I in xrange(NReps):
     # =================== -> optimize (eval_func, x0)
     
     xOpt = opt.optimize(x0)
+    opt2 = nlopt.opt(nlopt.LD_LBFGS, ND)
+    opt2.set_max_objective(eval_func)
+    #opt2.set_lower_bounds(np.ones(ND) * -1000000)
+    #opt2.set_upper_bounds(np.ones(ND) * 1000000)
+    #opt2.set_maxeval(100000)
+    #opt2.set_maxtime(2400)
+    xOpt = opt2.optimize(xOpt)
+    #opt = opt2
     
     # ===================
     endTime = time.time()
     
-    maxResp = opt.last_optimum_value()
+    maxResp = opt2.last_optimum_value()
     nIter = 0 
     
     print "  N: %i V: %.3f Time: %.3f" % (nIter, maxResp, endTime-startTime)
